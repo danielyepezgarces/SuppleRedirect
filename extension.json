@@ -1,0 +1,25 @@
+{
+	"name": "SuppleRedirect",
+	"version": "1.1.0",
+	"author": "[https://kimagurenote.net/ Kimagurenote]",
+	"url": "http://www.mediawiki.org/wiki/Extension:SuppleRedirect",
+	"descriptionmsg": "suppleredirect-desc",
+	"license-name": "BSD-3-Clause",
+	"type": "interface",
+	"requires": {
+		"MediaWiki": ">= 1.35.0"
+	},
+	"MessagesDirs": {
+		"SuppleRedirect": [
+			"i18n"
+		]
+	},
+	"AutoloadClasses": {
+		"SuppleRedirect": "includes/SuppleRedirect.php"
+	},
+	"Hooks": {
+		"BeforeDisplayNoArticleText": "SuppleRedirect::onBeforeDisplayNoArticleText",
+		"HtmlPageLinkRendererEnd": "SuppleRedirect::onHtmlPageLinkRendererEnd"
+	},
+	"manifest_version": 1
+}
