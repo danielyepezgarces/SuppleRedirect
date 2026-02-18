@@ -17,6 +17,7 @@ if( !defined( 'MEDIAWIKI' ) ) {
 
 use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\Linker\LinkTarget;
+use MediaWiki\Title\Title;
 
 class SuppleRedirect {
 
