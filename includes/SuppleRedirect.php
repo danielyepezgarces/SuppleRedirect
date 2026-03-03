@@ -1,9 +1,11 @@
 <?php
 /**
- * SuppleRedirect MediaWiki extension version 1.2.0 (Advanced Direct Access Control)
+ * SuppleRedirect MediaWiki extension (Fixed - NS_MAIN only)
  *
- * Redirects non-existing pages ONLY when accessed directly (no internal referer).
- * Allows normal creation flow when coming from inside the wiki.
+ * Redirects non-existing pages ONLY in the main namespace
+ * when accessed directly (no internal referer).
+ *
+ * Safe for Widgets, Templates, Special pages, etc.
  *
  * @license BSD-3-Clause
  */
@@ -32,7 +34,7 @@ class SuppleRedirect {
         }
 
         foreach ( $wgSuppleRedirectExcludes as $exclude ) {
-            if ( strcmp( $title, $exclude ) === 0 ) {
+            if ( strpos( $title, $exclude ) === 0 ) {
                 return true;
             }
         }
@@ -43,21 +45,12 @@ class SuppleRedirect {
     private static function generateLocalURL( $title ) {
         global $wgSuppleRedirectBaseURL;
 
-        $titleObj = Title::newFromText( $title );
-        if ( !$titleObj ) {
-            return '/wiki/' . rawurlencode( $title );
-        }
-
-        $ns = $titleObj->getNamespace();
-        $base = $wgSuppleRedirectBaseURL[$ns]
-            ?? $wgSuppleRedirectBaseURL['default']
-            ?? '/wiki/';
-
+        $base = $wgSuppleRedirectBaseURL['default'] ?? '/wiki/';
         return $base . rawurlencode( $title );
     }
 
     /**
-     * Modify red links
+     * Modify red links (NS_MAIN only)
      */
     public static function onHtmlPageLinkRendererEnd(
         LinkRenderer $linkRenderer,
@@ -67,18 +60,13 @@ class SuppleRedirect {
         &$attribs,
         &$ret
     ) {
-        global $wgContentNamespaces;
 
         if ( $isKnown || $target->isExternal() || self::checkConfig() ) {
             return true;
         }
 
-        $ns = $target->getNamespace();
-
-        if (
-            ( !empty( $wgContentNamespaces ) && !in_array( $ns, $wgContentNamespaces, true ) )
-            || ( empty( $wgContentNamespaces ) && $ns !== NS_MAIN )
-        ) {
+        // 🚨 SOLO namespace principal
+        if ( $target->getNamespace() !== NS_MAIN ) {
             return true;
         }
 
@@ -98,10 +86,10 @@ class SuppleRedirect {
     }
 
     /**
-     * Redirect only when accessed directly (no internal referer)
+     * Redirect only when accessed directly (NS_MAIN only)
      */
     public static function onBeforeDisplayNoArticleText( $article ) {
-        global $wgContentNamespaces, $wgSuppleRedirectPermanently, $wgServer;
+        global $wgSuppleRedirectPermanently, $wgServer;
 
         if ( self::checkConfig() ) {
             return true;
@@ -111,23 +99,19 @@ class SuppleRedirect {
         $request = $context->getRequest();
         $title = $article->getTitle();
 
-        // Manual bypass
+        // 🚨 SOLO namespace principal
+        if ( !$title->inNamespace( NS_MAIN ) ) {
+            return true;
+        }
+
+        // Permitir ?redirect=no
         if ( strcasecmp( $request->getText( 'redirect' ), 'no' ) === 0 ) {
             return true;
         }
 
-        // Allow creation/edit actions
+        // Permitir edición/creación
         $action = $request->getVal( 'action' );
         if ( in_array( $action, [ 'edit', 'submit' ], true ) ) {
-            return true;
-        }
-
-        $ns = $title->getNamespace();
-
-        if (
-            ( !empty( $wgContentNamespaces ) && !in_array( $ns, $wgContentNamespaces, true ) )
-            || ( empty( $wgContentNamespaces ) && $ns !== NS_MAIN )
-        ) {
             return true;
         }
 
@@ -137,7 +121,7 @@ class SuppleRedirect {
             return true;
         }
 
-        // 🔍 Check referer
+        // 🔍 Comprobar referer interno
         $referer = $request->getHeader( 'referer' );
 
         if ( !empty( $referer ) ) {
@@ -145,16 +129,15 @@ class SuppleRedirect {
             $parsedReferer = parse_url( $referer );
             $parsedServer = parse_url( $wgServer );
 
-            // Allow only if referer is same host
             if (
                 isset( $parsedReferer['host'], $parsedServer['host'] ) &&
                 $parsedReferer['host'] === $parsedServer['host']
             ) {
-                return true; // internal navigation allowed
+                return true; // navegación interna permitida
             }
         }
 
-        // If no valid internal referer → redirect
+        // 🔁 Redirigir
         $url = self::generateLocalURL( $fulltitle );
 
         $context->getOutput()->redirect(
